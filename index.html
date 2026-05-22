@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国际象棋</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #1a1a2e; min-height: 100vh; }
+        
+        #lobby { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        #lobby h1 { color: #fff; font-size: 2.5rem; margin-bottom: 30px; }
+        .menu-button { width: 250px; height: 50px; margin: 10px 0; font-size: 1.1rem; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; color: #fff; }
+        #btn-pvp { background: linear-gradient(135deg, #4CAF50, #45a049); }
+        #btn-ai { background: linear-gradient(135deg, #2196F3, #1976D2); }
+        #btn-lesson { background: linear-gradient(135deg, #9C27B0, #7B1FA2); }
+        
+        #color-select { display: none; flex-direction: column; align-items: center; padding: 30px; }
+        #color-select h2 { color: #fff; margin-bottom: 20px; }
+        .color-buttons { display: flex; gap: 30px; }
+        .color-btn { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; font-size: 1.2rem; font-weight: bold; }
+        #btn-white { background: #fff; color: #333; }
+        #btn-black { background: #333; color: #fff; }
+        #btn-back { background: #666; margin-top: 20px; }
+        
+        #game { display: none; flex-direction: column; align-items: center; padding: 20px; }
+        #board { display: grid; grid-template-columns: repeat(8, 60px); border: 4px solid #5D4037; border-radius: 8px; overflow: hidden; }
+        .square { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+        .light { background: #F0D9B5; }
+        .dark { background: #B58863; }
+        .square:hover { filter: brightness(1.1); }
+        .square.selected { box-shadow: inset 0 0 15px rgba(255, 215, 0, 0.8); }
+        .square.valid-move::after { content: ''; position: absolute; width: 15px; height: 15px; background: rgba(76, 175, 80, 0.6); border-radius: 50%; }
+        .square.valid-capture::after { content: ''; position: absolute; width: 100%; height: 100%; border: 3px solid rgba(244, 67, 54, 0.8); border-radius: 5px; }
+        
+        .piece { font-size: 40px; cursor: pointer; user-select: none; }
+        .piece.white { color: #fff; text-shadow: 1px 1px 2px #333; }
+        .piece.black { color: #000; text-shadow: 1px 1px 2px #666; }
+        
+        #info-panel { margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; color: #fff; min-width: 200px; }
+        #current-player { margin-bottom: 15px; }
+        #captured-pieces { margin-bottom: 15px; }
+        #move-history { max-height: 150px; overflow-y: auto; }
+        #moves { list-style: none; }
+        #moves li { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        
+        #game-over { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
+        #game-over-content { background: #2d2d44; padding: 30px; border-radius: 15px; text-align: center; }
+        #game-over-content h2 { color: #FFD700; margin-bottom: 15px; }
+        #game-over-content p { color: #fff; margin-bottom: 20px; }
+        #btn-play-again { padding: 10px 30px; font-size: 1rem; background: #4CAF50; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+        
+        #promotion-select { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
+        #promotion-content { background: #2d2d44; padding: 30px; border-radius: 15px; text-align: center; }
+        #promotion-content h2 { color: #FFD700; margin-bottom: 20px; }
+        .promotion-buttons { display: flex; gap: 15px; }
+        .promotion-btn { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #fff; cursor: pointer; font-size: 1.5rem; }
+        .promotion-btn.white { background: #fff; }
+        .promotion-btn.black { background: #333; }
+    </style>
+</head>
+<body>
+    <div id="lobby">
+        <h1>♟️ 国际象棋</h1>
+        <button class="menu-button" id="btn-pvp">双人对战</button>
+        <button class="menu-button" id="btn-ai">AI对战</button>
+        <button class="menu-button" id="btn-lesson">经典棋谱</button>
+    </div>
+    
+    <div id="color-select">
+        <h2>选择执子颜色</h2>
+        <div class="color-buttons">
+            <button class="color-btn" id="btn-white">白方</button>
+            <button class="color-btn" id="btn-black">黑方</button>
+        </div>
+        <button class="menu-button" id="btn-back">返回</button>
+    </div>
+    
+    <div id="lesson-select" style="display:none; flex-direction: column; align-items: center; padding: 30px;">
+        <h2 style="color: #fff; margin-bottom: 20px;">📚 选择棋谱教学</h2>
+        <div id="lesson-list" style="width: 100%; max-width: 500px;"></div>
+        <button class="menu-button" id="btn-back-lesson" style="margin-top: 20px; background: #666;">返回</button>
+    </div>
+    
+    <div id="game">
+        <div id="board"></div>
+        <div id="info-panel">
+            <div id="lesson-title" style="color: #FFD700; font-size: 1.2rem; margin-bottom: 10px; display: none;"></div>
+            <div id="current-player">当前回合: <span id="current-player-span">白方</span></div>
+            <div id="lesson-hint" style="background: rgba(255, 215, 0, 0.1); padding: 10px; border-radius: 5px; margin: 10px 0; color: #FFD700;"></div>
+            <div id="captured-pieces">
+                <div id="captured-white">白方被吃: </div>
+                <div id="captured-black">黑方被吃: </div>
+            </div>
+            <div id="move-history">
+                <ul id="moves"></ul>
+            </div>
+            <button id="btn-undo" style="margin-top: 10px; padding: 5px 15px;">悔棋</button>
+            <button id="btn-restart" style="margin-left: 10px; padding: 5px 15px;">重新开始</button>
+        </div>
+    </div>
+    
+    <div id="game-over">
+        <div id="game-over-content">
+            <h2>游戏结束</h2>
+            <p id="game-over-message"></p>
+            <button id="btn-play-again">再玩一局</button>
+        </div>
+    </div>
+    
+    <div id="promotion-select">
+        <div id="promotion-content">
+            <h2>选择升变棋子</h2>
+            <div class="promotion-buttons" id="promotion-buttons"></div>
+        </div>
+    </div>
+
+    <script>
+        const board = [];
+        let currentPlayer = 'white';
+        let selectedPiece = null;
+        let validMoves = [];
+        let gameMode = '';
+        let userColor = 'white';
+        let isGameOver = false;
+        
+        const castlingRights = { white: { kingside: true, queenside: true }, black: { kingside: true, queenside: true } };
+        let enPassantTarget = null;
+        const capturedPieces = { white: [], black: [] };
+        const moveHistory = [];
+        const historyStack = [];
+        
+        const pieceSymbols = {
+            'P': '♙', 'N': '♘', 'B': '♗', 'R': '♖', 'Q': '♕', 'K': '♔',
+            'p': '♟️', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚'
+        };
+        
+        const classicLessons = [
+            {
+                name: '意大利开局',
+                description: '最经典的国际象棋开局之一，白方快速发展主教攻击中心',
+                steps: [
+                    { from: [6, 4], to: [4, 4], hint: '白方走e4，控制中心' },
+                    { from: [1, 4], to: [3, 4], hint: '黑方走e5，争夺中心' },
+                    { from: [7, 1], to: [5, 2], hint: '白方走Nf3，攻击e5兵' },
+                    { from: [0, 1], to: [2, 2], hint: '黑方走Nc6，保护e5兵' },
+                    { from: [7, 2], to: [4, 5], hint: '白方走Bc4，瞄准f7弱点' },
+                    { from: [0, 2], to: [3, 5], hint: '黑方走Bc5，形成对称局面' }
+                ]
+            },
+            {
+                name: '西班牙开局',
+                description: '最流行的开局之一，白方通过主教牵制黑方骑士',
+                steps: [
+                    { from: [6, 4], to: [4, 4], hint: '白方走e4' },
+                    { from: [1, 4], to: [3, 4], hint: '黑方走e5' },
+                    { from: [7, 1], to: [5, 2], hint: '白方走Nf3' },
+                    { from: [0, 1], to: [2, 2], hint: '黑方走Nc6' },
+                    { from: [7, 2], to: [4, 1], hint: '白方走Bb5，牵制黑方骑士' },
+                    { from: [1, 0], to: [2, 0], hint: '黑方走a6，准备驱赶白象' }
+                ]
+            },
+            {
+                name: '法兰西防御',
+                description: '黑方用d5反击白方e4的经典防御',
+                steps: [
+                    { from: [6, 4], to: [4, 4], hint: '白方走e4' },
+                    { from: [1, 4], to: [2, 4], hint: '黑方走e6' },
+                    { from: [6, 3], to: [4, 3], hint: '白方走d4' },
+                    { from: [1, 3], to: [3, 3], hint: '黑方走d5' },
+                    { from: [4, 4], to: [3, 3], hint: '白方走exd5' },
+                    { from: [2, 4], to: [3, 3], hint: '黑方走exd5' }
+                ]
+            },
+            {
+                name: '西西里防御',
+                description: '黑方用c5反击白方e4的激进入法',
+                steps: [
+                    { from: [6, 4], to: [4, 4], hint: '白方走e4' },
+                    { from: [1, 1], to: [3, 1], hint: '黑方走c5，形成西西里防御' },
+                    { from: [7, 1], to: [5, 2], hint: '白方走Nf3' },
+                    { from: [1, 3], to: [3, 3], hint: '黑方走d6' },
+                    { from: [6, 3], to: [4, 3], hint: '白方走d4' },
+                    { from: [3, 1], to: [4, 1], hint: '黑方走d5' }
+                ]
+            }
+        ];
+        
+        let currentLesson = null;
+        let currentLessonStep = 0;
+        
+        function initBoard() {
+            board.length = 0;
+            for (let i = 0; i < 8; i++) board.push(new Array(8).fill(null));
+            
+            board[0] = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+            board[1] = ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'];
+            board[6] = ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'];
+            board[7] = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
+        }
+        
+        function isWhitePiece(piece) { return piece && piece === piece.toUpperCase(); }
+        
+        function getValidMoves(row, col) {
+            const piece = board[row][col];
+            if (!piece) return [];
+            
+            const moves = [];
+            const pieceType = piece.toLowerCase();
+            const isWhite = isWhitePiece(piece);
+            
+            if (pieceType === 'p') {
+                const dir = isWhite ? -1 : 1;
+                if (board[row + dir] && !board[row + dir][col]) {
+                    moves.push({ row: row + dir, col });
+                    if ((isWhite && row === 6) || (!isWhite && row === 1)) {
+                        if (!board[row + 2 * dir][col]) moves.push({ row: row + 2 * dir, col });
+                    }
+                }
+                for (const dc of [-1, 1]) {
+                    const newRow = row + dir, newCol = col + dc;
+                    if (board[newRow] && board[newRow][newCol]) {
+                        if (isWhitePiece(board[newRow][newCol]) !== isWhite) moves.push({ row: newRow, col: newCol });
+                    } else if (enPassantTarget && enPassantTarget.row === newRow && enPassantTarget.col === newCol) {
+                        moves.push({ row: newRow, col: newCol, enPassant: true });
+                    }
+                }
+            } else if (pieceType === 'n') {
+                const deltas = [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+                for (const [dr, dc] of deltas) {
+                    const newRow = row + dr, newCol = col + dc;
+                    if (board[newRow] && board[newRow][newCol] !== undefined) {
+                        if (!board[newRow][newCol] || isWhitePiece(board[newRow][newCol]) !== isWhite) {
+                            moves.push({ row: newRow, col: newCol });
+                        }
+                    }
+                }
+            } else if (pieceType === 'b' || pieceType === 'q') {
+                const dirs = pieceType === 'b' ? [[1,1],[1,-1],[-1,1],[-1,-1]] : 
+                                               [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+                for (const [dr, dc] of dirs) {
+                    let r = row + dr, c = col + dc;
+                    while (board[r] && board[r][c] !== undefined) {
+                        if (!board[r][c]) {
+                            moves.push({ row: r, col: c });
+                        } else {
+                            if (isWhitePiece(board[r][c]) !== isWhite) moves.push({ row: r, col: c });
+                            break;
+                        }
+                        r += dr; c += dc;
+                    }
+                }
+            } else if (pieceType === 'r') {
+                const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+                for (const [dr, dc] of dirs) {
+                    let r = row + dr, c = col + dc;
+                    while (board[r] && board[r][c] !== undefined) {
+                        if (!board[r][c]) {
+                            moves.push({ row: r, col: c });
+                        } else {
+                            if (isWhitePiece(board[r][c]) !== isWhite) moves.push({ row: r, col: c });
+                            break;
+                        }
+                        r += dr; c += dc;
+                    }
+                }
+            } else if (pieceType === 'k') {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const newRow = row + dr, newCol = col + dc;
+                        if (board[newRow] && board[newRow][newCol] !== undefined) {
+                            if (!board[newRow][newCol] || isWhitePiece(board[newRow][newCol]) !== isWhite) {
+                                moves.push({ row: newRow, col: newCol });
+                            }
+                        }
+                    }
+                }
+                if (canCastleKingside(isWhite)) moves.push({ row, col: col + 2, castling: 'kingside' });
+                if (canCastleQueenside(isWhite)) moves.push({ row, col: col - 2, castling: 'queenside' });
+            }
+            
+            return moves.filter(m => !wouldBeInCheck(row, col, m.row, m.col));
+        }
+        
+        function canCastleKingside(isWhite) {
+            const row = isWhite ? 7 : 0;
+            const rights = castlingRights[isWhite ? 'white' : 'black'];
+            if (!rights.kingside || board[row][5] || board[row][6]) return false;
+            if (isSquareAttacked(row, 4, !isWhite) || isSquareAttacked(row, 5, !isWhite) || isSquareAttacked(row, 6, !isWhite)) return false;
+            return true;
+        }
+        
+        function canCastleQueenside(isWhite) {
+            const row = isWhite ? 7 : 0;
+            const rights = castlingRights[isWhite ? 'white' : 'black'];
+            if (!rights.queenside || board[row][1] || board[row][2] || board[row][3]) return false;
+            if (isSquareAttacked(row, 4, !isWhite) || isSquareAttacked(row, 3, !isWhite) || isSquareAttacked(row, 2, !isWhite)) return false;
+            return true;
+        }
+        
+        function isSquareAttacked(row, col, attackerIsWhite, testBoard = board) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = testBoard[r][c];
+                    if (!piece || isWhitePiece(piece) !== attackerIsWhite) continue;
+                    
+                    const pt = piece.toLowerCase();
+                    if (pt === 'p') {
+                        const dir = attackerIsWhite ? -1 : 1;
+                        if (r + dir === row && (c - 1 === col || c + 1 === col)) return true;
+                    } else if (pt === 'n') {
+                        const deltas = [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+                        if (deltas.some(([dr, dc]) => r + dr === row && c + dc === col)) return true;
+                    } else if (pt === 'k') {
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                if (r + dr === row && c + dc === col) return true;
+                            }
+                        }
+                    } else if ((pt === 'r' || pt === 'q') && (r === row || c === col)) {
+                        let blocked = false;
+                        if (r === row) {
+                            const minC = Math.min(c, col), maxC = Math.max(c, col);
+                            for (let cc = minC + 1; cc < maxC && !blocked; cc++) blocked = !!testBoard[r][cc];
+                        } else {
+                            const minR = Math.min(r, row), maxR = Math.max(r, row);
+                            for (let rr = minR + 1; rr < maxR && !blocked; rr++) blocked = !!testBoard[rr][c];
+                        }
+                        if (!blocked) return true;
+                    }
+                    if ((pt === 'b' || pt === 'q') && Math.abs(r - row) === Math.abs(c - col)) {
+                        let blocked = false;
+                        const dr = row > r ? 1 : -1, dc = col > c ? 1 : -1;
+                        for (let rr = r + dr, cc = c + dc; rr !== row && !blocked; rr += dr, cc += dc) blocked = !!testBoard[rr][cc];
+                        if (!blocked) return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function wouldBeInCheck(fromRow, fromCol, toRow, toCol) {
+            const testBoard = board.map(r => [...r]);
+            const piece = testBoard[fromRow][fromCol];
+            testBoard[toRow][toCol] = piece;
+            testBoard[fromRow][fromCol] = null;
+            
+            let kingPos = null;
+            const isWhite = isWhitePiece(piece);
+            for (let r = 0; r < 8 && !kingPos; r++) {
+                for (let c = 0; c < 8 && !kingPos; c++) {
+                    if (testBoard[r][c] === (isWhite ? 'K' : 'k')) kingPos = { row: r, col: c };
+                }
+            }
+            
+            return isSquareAttacked(kingPos.row, kingPos.col, !isWhite, testBoard);
+        }
+        
+        function saveState() {
+            historyStack.push({
+                board: board.map(r => [...r]),
+                currentPlayer,
+                capturedPieces: { white: [...capturedPieces.white], black: [...capturedPieces.black] },
+                moveHistory: [...moveHistory],
+                castlingRights: JSON.parse(JSON.stringify(castlingRights)),
+                enPassantTarget: enPassantTarget ? { ...enPassantTarget } : null
+            });
+        }
+        
+        let pendingPromotion = null;
+        let isFlipped = false;
+        
+        function getDisplayCoords(row, col) {
+            if (userColor === 'black') return { row: 7 - row, col: 7 - col };
+            return { row, col };
+        }
+        
+        function getInternalCoords(displayRow, displayCol) {
+            if (userColor === 'black') return { row: 7 - displayRow, col: 7 - displayCol };
+            return { row: displayRow, col: displayCol };
+        }
+        
+        function makeMove(fromRow, fromCol, toRow, toCol, special = {}, promotionPiece = 'Q') {
+            saveState();
+            
+            const piece = board[fromRow][fromCol];
+            const capturedPiece = board[toRow][toCol];
+            
+            if (capturedPiece) {
+                if (isWhitePiece(capturedPiece)) capturedPieces.black.push(capturedPiece);
+                else capturedPieces.white.push(capturedPiece);
+            }
+            
+            if (special.enPassant) {
+                const capturedRow = isWhitePiece(piece) ? toRow + 1 : toRow - 1;
+                const capturedPawn = board[capturedRow][toCol];
+                if (isWhitePiece(capturedPawn)) capturedPieces.black.push(capturedPawn);
+                else capturedPieces.white.push(capturedPawn);
+                board[capturedRow][toCol] = null;
+            }
+            
+            if (special.castling) {
+                const row = fromRow;
+                if (special.castling === 'kingside') { board[row][5] = board[row][7]; board[row][7] = null; }
+                else { board[row][3] = board[row][0]; board[row][0] = null; }
+            }
+            
+            let finalPiece = piece;
+            if (piece.toLowerCase() === 'p' && (toRow === 0 || toRow === 7)) {
+                finalPiece = isWhitePiece(piece) ? promotionPiece.toUpperCase() : promotionPiece.toLowerCase();
+            }
+            
+            board[toRow][toCol] = finalPiece;
+            board[fromRow][fromCol] = null;
+            
+            if (piece.toLowerCase() === 'k') {
+                const color = isWhitePiece(piece) ? 'white' : 'black';
+                castlingRights[color].kingside = false;
+                castlingRights[color].queenside = false;
+            }
+            
+            if (piece.toLowerCase() === 'r') {
+                const color = isWhitePiece(piece) ? 'white' : 'black';
+                if (fromCol === 0) castlingRights[color].queenside = false;
+                if (fromCol === 7) castlingRights[color].kingside = false;
+            }
+            
+            enPassantTarget = (piece.toLowerCase() === 'p' && Math.abs(toRow - fromRow) === 2) ? 
+                             { row: (fromRow + toRow) / 2, col: fromCol } : null;
+            
+            const notation = piece.toLowerCase() === 'p' ? '' : piece.toUpperCase();
+            const capture = capturedPiece || special.enPassant ? 'x' : '';
+            const toSquare = `${String.fromCharCode(97 + toCol)}${8 - toRow}`;
+            moveHistory.push(`${notation}${capture}${toSquare}`);
+            
+            currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+        }
+        
+        function undoMove() {
+            if (historyStack.length === 0) return;
+            const last = historyStack.pop();
+            board.length = 0;
+            for (const row of last.board) board.push([...row]);
+            currentPlayer = last.currentPlayer;
+            capturedPieces.white = [...last.capturedPieces.white];
+            capturedPieces.black = [...last.capturedPieces.black];
+            moveHistory.length = 0;
+            for (const move of last.moveHistory) moveHistory.push(move);
+            castlingRights.white = { ...last.castlingRights.white };
+            castlingRights.black = { ...last.castlingRights.black };
+            enPassantTarget = last.enPassantTarget ? { ...last.enPassantTarget } : null;
+            isGameOver = false;
+            selectedPiece = null;
+            validMoves = [];
+            updateGameInfo();
+            renderBoard();
+        }
+        
+        function renderBoard() {
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
+            isFlipped = userColor === 'black';
+            
+            for (let displayRow = 0; displayRow < 8; displayRow++) {
+                for (let displayCol = 0; displayCol < 8; displayCol++) {
+                    const { row, col } = getInternalCoords(displayRow, displayCol);
+                    const square = document.createElement('div');
+                    square.className = `square ${(displayRow + displayCol) % 2 === 0 ? 'light' : 'dark'}`;
+                    
+                    const piece = board[row][col];
+                    if (piece) {
+                        const pieceElement = document.createElement('span');
+                        pieceElement.className = `piece ${isWhitePiece(piece) ? 'white' : 'black'}`;
+                        pieceElement.textContent = pieceSymbols[piece];
+                        square.appendChild(pieceElement);
+                    }
+                    
+                    if (selectedPiece && selectedPiece.row === row && selectedPiece.col === col) {
+                        square.classList.add('selected');
+                    }
+                    
+                    if (validMoves.some(m => m.row === row && m.col === col)) {
+                        const isValidCapture = board[row][col] && isWhitePiece(board[row][col]) !== isWhitePiece(board[selectedPiece.row][selectedPiece.col]);
+                        square.classList.add(isValidCapture ? 'valid-capture' : 'valid-move');
+                    }
+                    
+                    const internalRow = row;
+                    const internalCol = col;
+                    square.addEventListener('click', () => handleSquareClick(internalRow, internalCol));
+                    boardElement.appendChild(square);
+                }
+            }
+            
+            if (gameMode === 'lesson' && currentLesson && currentLessonStep < currentLesson.steps.length) {
+                const step = currentLesson.steps[currentLessonStep];
+                const fromDisplay = getDisplayCoords(step.from[0], step.from[1]);
+                const toDisplay = getDisplayCoords(step.to[0], step.to[1]);
+                const squares = boardElement.querySelectorAll('.square');
+                const fromIndex = fromDisplay.row * 8 + fromDisplay.col;
+                const toIndex = toDisplay.row * 8 + toDisplay.col;
+                if (squares[fromIndex]) squares[fromIndex].style.background = 'rgba(76, 175, 80, 0.5)';
+                if (squares[toIndex]) squares[toIndex].style.background = 'rgba(76, 175, 80, 0.5)';
+                document.getElementById('lesson-hint').textContent = step.hint;
+            }
+        }
+        
+        function handleLessonClick(row, col) {
+            if (!currentLesson || currentLessonStep >= currentLesson.steps.length) return;
+            
+            const step = currentLesson.steps[currentLessonStep];
+            
+            if (row === step.from[0] && col === step.from[1]) {
+                selectedPiece = { row, col };
+                validMoves = [{ row: step.to[0], col: step.to[1] }];
+            } else if (selectedPiece && row === step.to[0] && col === step.to[1]) {
+                makeMove(selectedPiece.row, selectedPiece.col, row, col, {});
+                selectedPiece = null;
+                validMoves = [];
+                currentLessonStep++;
+                
+                if (currentLessonStep >= currentLesson.steps.length) {
+                    showGameOver('🎉 恭喜！你完成了这个棋谱教学！');
+                }
+                
+                updateGameInfo();
+            }
+            
+            renderBoard();
+        }
+        
+        function handleSquareClick(row, col) {
+            if (isGameOver) return;
+            
+            if (gameMode === 'ai' && currentPlayer !== userColor) return;
+            
+            if (gameMode === 'lesson' && currentLesson) {
+                handleLessonClick(row, col);
+                return;
+            }
+            
+            const piece = board[row][col];
+            
+            if (selectedPiece) {
+                const isValidMove = validMoves.some(m => m.row === row && m.col === col);
+                
+                if (isValidMove) {
+                    const validMove = validMoves.find(m => m.row === row && m.col === col);
+                    const special = {};
+                    if (validMove.enPassant) special.enPassant = true;
+                    if (validMove.castling) special.castling = validMove.castling;
+                    
+                    const movingPiece = board[selectedPiece.row][selectedPiece.col];
+                    if (movingPiece.toLowerCase() === 'p' && (row === 0 || row === 7)) {
+                        pendingPromotion = { fromRow: selectedPiece.row, fromCol: selectedPiece.col, toRow: row, toCol: col, special };
+                        showPromotionSelect(isWhitePiece(movingPiece));
+                        return;
+                    }
+                    
+                    makeMove(selectedPiece.row, selectedPiece.col, row, col, special);
+                    selectedPiece = null;
+                    validMoves = [];
+                    
+                    updateGameInfo();
+                    checkGameOver();
+                    
+                    if (gameMode === 'ai' && !isGameOver) setTimeout(() => aiMove(), 500);
+                } else if (piece && isWhitePiece(piece) === (currentPlayer === 'white')) {
+                    selectedPiece = { row, col };
+                    validMoves = getValidMoves(row, col);
+                } else {
+                    selectedPiece = null;
+                    validMoves = [];
+                }
+            } else if (piece && isWhitePiece(piece) === (currentPlayer === 'white')) {
+                selectedPiece = { row, col };
+                validMoves = getValidMoves(row, col);
+            }
+            
+            renderBoard();
+        }
+        
+        function showPromotionSelect(isWhite) {
+            const promotionDiv = document.getElementById('promotion-select');
+            const buttonsDiv = document.getElementById('promotion-buttons');
+            buttonsDiv.innerHTML = '';
+            
+            ['Q', 'R', 'B', 'N'].forEach(piece => {
+                const btn = document.createElement('button');
+                btn.className = `promotion-btn ${isWhite ? 'white' : 'black'}`;
+                btn.textContent = pieceSymbols[isWhite ? piece : piece.toLowerCase()];
+                btn.addEventListener('click', () => {
+                    if (pendingPromotion) {
+                        makeMove(pendingPromotion.fromRow, pendingPromotion.fromCol, pendingPromotion.toRow, pendingPromotion.toCol, pendingPromotion.special, piece);
+                        pendingPromotion = null;
+                        promotionDiv.style.display = 'none';
+                        updateGameInfo();
+                        checkGameOver();
+                        if (gameMode === 'ai' && !isGameOver) setTimeout(() => aiMove(), 500);
+                        renderBoard();
+                    }
+                });
+                buttonsDiv.appendChild(btn);
+            });
+            
+            promotionDiv.style.display = 'flex';
+        }
+        
+        function updateGameInfo() {
+            document.getElementById('current-player-span').textContent = currentPlayer === 'white' ? '白方' : '黑方';
+            
+            const whiteDiv = document.getElementById('captured-white');
+            const blackDiv = document.getElementById('captured-black');
+            whiteDiv.innerHTML = '白方被吃: ';
+            blackDiv.innerHTML = '黑方被吃: ';
+            
+            for (const piece of capturedPieces.white) {
+                const span = document.createElement('span');
+                span.className = 'piece black';
+                span.textContent = pieceSymbols[piece];
+                whiteDiv.appendChild(span);
+            }
+            for (const piece of capturedPieces.black) {
+                const span = document.createElement('span');
+                span.className = 'piece white';
+                span.textContent = pieceSymbols[piece];
+                blackDiv.appendChild(span);
+            }
+            
+            const movesList = document.getElementById('moves');
+            movesList.innerHTML = '';
+            for (let i = 0; i < moveHistory.length; i += 2) {
+                const li = document.createElement('li');
+                li.textContent = `${Math.floor(i / 2) + 1}. ${moveHistory[i]} ${moveHistory[i + 1] || ''}`;
+                movesList.appendChild(li);
+            }
+            movesList.scrollTop = movesList.scrollHeight;
+        }
+        
+        function checkGameOver() {
+            const isWhiteTurn = currentPlayer === 'white';
+            let hasValidMoves = false;
+            
+            for (let r = 0; r < 8 && !hasValidMoves; r++) {
+                for (let c = 0; c < 8 && !hasValidMoves; c++) {
+                    const piece = board[r][c];
+                    if (piece && isWhitePiece(piece) === isWhiteTurn) {
+                        if (getValidMoves(r, c).length > 0) hasValidMoves = true;
+                    }
+                }
+            }
+            
+            if (!hasValidMoves) {
+                isGameOver = true;
+                let kingPos = null;
+                for (let r = 0; r < 8 && !kingPos; r++) {
+                    for (let c = 0; c < 8 && !kingPos; c++) {
+                        if (board[r][c] === (isWhiteTurn ? 'K' : 'k')) kingPos = { row: r, col: c };
+                    }
+                }
+                const isInCheck = isSquareAttacked(kingPos.row, kingPos.col, !isWhiteTurn);
+                showGameOver(isInCheck ? (isWhiteTurn ? '黑方' : '白方') + '获胜！' : '平局！');
+            }
+        }
+        
+        function showGameOver(message) {
+            document.getElementById('game-over-message').textContent = message;
+            document.getElementById('game-over').style.display = 'flex';
+        }
+        
+        function aiMove() {
+            if (isGameOver) return;
+            
+            const moves = [];
+            const aiColor = userColor === 'white' ? 'black' : 'white';
+            
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = board[r][c];
+                    if (piece && isWhitePiece(piece) !== (userColor === 'white')) {
+                        const validMoves = getValidMoves(r, c);
+                        for (const move of validMoves) {
+                            moves.push({ fromRow: r, fromCol: c, toRow: move.row, toCol: move.col, special: { enPassant: move.enPassant, castling: move.castling } });
+                        }
+                    }
+                }
+            }
+            
+            if (moves.length === 0) return;
+            
+            const randomMove = moves[Math.floor(Math.random() * moves.length)];
+            const piece = board[randomMove.fromRow][randomMove.fromCol];
+            
+            if (piece.toLowerCase() === 'p' && (randomMove.toRow === 0 || randomMove.toRow === 7)) {
+                makeMove(randomMove.fromRow, randomMove.fromCol, randomMove.toRow, randomMove.toCol, randomMove.special, 'Q');
+            } else {
+                makeMove(randomMove.fromRow, randomMove.fromCol, randomMove.toRow, randomMove.toCol, randomMove.special);
+            }
+            
+            updateGameInfo();
+            checkGameOver();
+            renderBoard();
+        }
+        
+        function startGame(mode, color = 'white') {
+            initBoard();
+            userColor = color;
+            currentPlayer = 'white';
+            gameMode = mode;
+            isGameOver = false;
+            selectedPiece = null;
+            validMoves = [];
+            capturedPieces.white = [];
+            capturedPieces.black = [];
+            moveHistory.length = 0;
+            historyStack.length = 0;
+            castlingRights.white = { kingside: true, queenside: true };
+            castlingRights.black = { kingside: true, queenside: true };
+            enPassantTarget = null;
+            currentLesson = null;
+            currentLessonStep = 0;
+            
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('color-select').style.display = 'none';
+            document.getElementById('lesson-select').style.display = 'none';
+            document.getElementById('game').style.display = 'flex';
+            document.getElementById('lesson-title').style.display = 'none';
+            
+            updateGameInfo();
+            renderBoard();
+            
+            if (gameMode === 'ai' && userColor === 'black') setTimeout(() => aiMove(), 500);
+        }
+        
+        function startLesson(lesson) {
+            initBoard();
+            userColor = 'white';
+            currentPlayer = 'white';
+            gameMode = 'lesson';
+            isGameOver = false;
+            selectedPiece = null;
+            validMoves = [];
+            capturedPieces.white = [];
+            capturedPieces.black = [];
+            moveHistory.length = 0;
+            historyStack.length = 0;
+            castlingRights.white = { kingside: true, queenside: true };
+            castlingRights.black = { kingside: true, queenside: true };
+            enPassantTarget = null;
+            currentLesson = lesson;
+            currentLessonStep = 0;
+            
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('lesson-select').style.display = 'none';
+            document.getElementById('color-select').style.display = 'none';
+            document.getElementById('game').style.display = 'flex';
+            document.getElementById('lesson-title').style.display = 'block';
+            document.getElementById('lesson-title').textContent = '📚 ' + lesson.name;
+            
+            updateGameInfo();
+            renderBoard();
+        }
+        
+        function populateLessonList() {
+            const lessonList = document.getElementById('lesson-list');
+            lessonList.innerHTML = '';
+            
+            classicLessons.forEach(lesson => {
+                const item = document.createElement('div');
+                item.className = 'lesson-item';
+                item.style.cssText = 'background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s;';
+                item.innerHTML = `<h3 style="color: #FFD700; margin-bottom: 10px;">${lesson.name}</h3><p style="color: #ccc; font-size: 0.9rem;">${lesson.description}</p>`;
+                item.addEventListener('click', () => startLesson(lesson));
+                item.addEventListener('mouseenter', () => item.style.background = 'rgba(255,255,255,0.2)');
+                item.addEventListener('mouseleave', () => item.style.background = 'rgba(255,255,255,0.1)');
+                lessonList.appendChild(item);
+            });
+        }
+        
+        document.getElementById('btn-pvp').addEventListener('click', () => {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('color-select').style.display = 'flex';
+        });
+        
+        document.getElementById('btn-ai').addEventListener('click', () => {
+            gameMode = 'ai';
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('color-select').style.display = 'flex';
+        });
+        
+        document.getElementById('btn-white').addEventListener('click', () => startGame(gameMode || 'pvp', 'white'));
+        document.getElementById('btn-black').addEventListener('click', () => startGame(gameMode || 'pvp', 'black'));
+        document.getElementById('btn-back').addEventListener('click', () => {
+            document.getElementById('color-select').style.display = 'none';
+            document.getElementById('lobby').style.display = 'flex';
+        });
+        
+        document.getElementById('btn-undo').addEventListener('click', undoMove);
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            document.getElementById('game').style.display = 'none';
+            document.getElementById('lobby').style.display = 'flex';
+            document.getElementById('lesson-title').style.display = 'none';
+        });
+        
+        document.getElementById('btn-play-again').addEventListener('click', () => {
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('game').style.display = 'none';
+            document.getElementById('lobby').style.display = 'flex';
+            document.getElementById('lesson-title').style.display = 'none';
+        });
+        
+        document.getElementById('btn-lesson').addEventListener('click', () => {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('lesson-select').style.display = 'flex';
+            populateLessonList();
+        });
+        
+        document.getElementById('btn-back-lesson').addEventListener('click', () => {
+            document.getElementById('lesson-select').style.display = 'none';
+            document.getElementById('lobby').style.display = 'flex';
+        });
+    </script>
+</body>
+</html>
